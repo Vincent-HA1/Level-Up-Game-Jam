@@ -18,23 +18,18 @@ public class EnemyController : MonoBehaviour
 
     private Camera MainCamera;
 
-    private Vector3 StartPos;
+    private Vector3 SettlementGuardPos;
+
+    private bool PlayerInRange = false;
+    private bool AttackingSettlement = false;
+
+    private bool PartOfEnemyCamp = false;
     // Start is called before the first frame update
     void Start()
     {
         Rigidbody = GetComponent<Rigidbody2D>();
         MainCamera = Camera.main;
-
-        /*
-        //Test code
-        if (!SettlementBeingGuarded)
-        {
-            Target = GameObject.Find("Player").transform;
-        }
-        */
-
-        //Target = GameObject.Find("Player").transform;
-        StartPos = transform.position;
+        Target = GameObject.Find("Player").transform; //set the target initially 
     }
 
     private void Update()
@@ -46,36 +41,35 @@ public class EnemyController : MonoBehaviour
             Target = SettlementOverlapped.transform;
         }
         */
-        //logic for guarding settlement
-        if (SettlementBeingGuarded)
+        CheckForPlayer();
+        CheckForSettlement();
+
+
+    }
+
+
+    private void CheckForSettlement()
+    {
+        if (!PlayerInRange || !PositionInCameraBounds(transform.position))
         {
-            Collider2D PlayerOverlapped = Physics2D.OverlapCircle(transform.position, EnemyAwarenessRadius, PlayerLayer);
-            if (PlayerOverlapped != null)
-            {
-                print("player seen");
-                Target = PlayerOverlapped.transform;
-            }
-            if (!PositionInCameraBounds(transform.position) && !PlayerOverlapped)
-            {
-                Target = null;
-                //move back to start
-                MoveTowardsTarget(StartPos);
-            }
-        }
-        else
-        {
-            //when the settlement gets destroyed, go back to chasing the enemy
-            if (!Target || !SettlementBeingGuarded)
-            {
-                Target = GameObject.Find("Player").transform;
-            }
-            //if there is a settlement
+            print("checking for settlement");
+            //If there is a settlement, and we aren't already guarding a settlement
             Collider2D SettlementOverlapped = Physics2D.OverlapCircle(transform.position, EnemyAwarenessRadius, SettlementLayer);
-            if (SettlementOverlapped != null)
+            if (SettlementOverlapped != null && !SettlementBeingGuarded)//Target && Target.gameObject.layer != SettlementLayer)
             {
-                Target = SettlementOverlapped.transform;
+                //Can guard settlement if part of an enemy camp and it is uncaptured, or otherwise can only go after captured settlements
+                Settlement SettlementToGuard = SettlementOverlapped.GetComponent<Settlement>();
+                print(SettlementToGuard.IsCaptured);
+                if (!SettlementToGuard.IsCaptured && PartOfEnemyCamp || SettlementToGuard.IsCaptured)
+                {
+                    GuardSettlement(SettlementOverlapped.GetComponent<Settlement>());
+
+                }
+
+
             }
         }
+
     }
 
     // Update is called once per frame
@@ -83,22 +77,84 @@ public class EnemyController : MonoBehaviour
     {
         if (Target)
         {
-            MoveTowardsTarget(Target.position);
+            //If moving towards settlement currently, then check for stuff
+            if(SettlementBeingGuarded && Target == SettlementBeingGuarded.transform)
+            {
+                if(MoveTowardsTarget(Target.position, 2) && !AttackingSettlement)
+                {
+                    AttackSettlement();
+                }
+            }
+            else
+            {
+                MoveTowardsTarget(Target.position);
+            }
         }
     }
 
-    void MoveTowardsTarget(Vector3 TargetPosition)
+    private void AttackSettlement()
+    {
+        print("attack settlement");
+        print(SettlementBeingGuarded);
+        SettlementBeingGuarded.AddEnemyAttacker(); //close enough to settlement, so add attacker
+        AttackingSettlement = true;
+    }
+
+    void CheckForPlayer()
+    {
+        Collider2D PlayerOverlapped = Physics2D.OverlapCircle(transform.position, EnemyAwarenessRadius, PlayerLayer);
+        if (PlayerOverlapped != null)
+        {
+            PlayerInRange = true;
+            print("player seen");
+            Target = PlayerOverlapped.transform;
+            StopAttackingSettlement();
+        }
+        else
+        {
+            PlayerInRange = false;//no player in range, but continue to chase if nthing else is in range
+            if (SettlementBeingGuarded)
+            {
+                //go back to settement
+                Target = SettlementBeingGuarded.transform;
+            }
+        }
+    }
+
+    private void StopAttackingSettlement()
+    {
+        if (SettlementBeingGuarded && AttackingSettlement)
+        {
+            //Remove attacker for now
+            SettlementBeingGuarded.RemoveEnemyAttacker();
+            AttackingSettlement = false;
+        }
+    }
+
+    bool MoveTowardsTarget(Vector3 TargetPosition, float AcceptanceDistance = 0.1f)
     {
         //If close enough, stop moving
-        if (Vector3.Distance(transform.position, TargetPosition) < 0.1f)  return; 
+        if (Vector3.Distance(transform.position, TargetPosition) < AcceptanceDistance)  return true; 
         Vector2 MoveDirection = (TargetPosition - transform.position).normalized;
         Rigidbody.MovePosition(Rigidbody.position + MoveDirection * MoveSpeed * Time.deltaTime);
+
+        return false;
     }
 
     public void GuardSettlement(Settlement SettlementToGuard)
     {
+        Target = SettlementToGuard.transform;
         //set the settlement here
         SettlementBeingGuarded = SettlementToGuard;
+        SettlementBeingGuarded.SettlementDestroyed += SettlementDestroyed; //Bind event
+    }
+
+    void SettlementDestroyed(Settlement DestroyedSettlement)
+    {
+        SettlementBeingGuarded = null;
+        AttackingSettlement = false;
+        Target = GameObject.Find("Player").transform;
+        print("settlement destroyed");
     }
 
     bool PositionInCameraBounds(Vector3 Position)
@@ -114,5 +170,10 @@ public class EnemyController : MonoBehaviour
             return true;
         }
         return false;
+    }
+    
+    public void IsPartOfEnemyCamp()
+    {
+        PartOfEnemyCamp = true;
     }
 }

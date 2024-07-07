@@ -58,11 +58,7 @@ public class SpawnManager : MonoBehaviour
 
     void SpawnEnemies()
     {
-        Vector3 SpawnPoint = GetSpawnPoint();
-        while (PositionInCameraBounds(SpawnPoint))
-        {
-            SpawnPoint = GetSpawnPoint();
-        }
+        Vector3 SpawnPoint = GetSpawnPointOutsideOfCameraBounds();
         int SpawnIndex = Mathf.Clamp(GameDifficulty, 0, Enemies.Count - 1);
         Instantiate(Enemies[SpawnIndex], SpawnPoint, Quaternion.identity, transform);
 
@@ -83,7 +79,7 @@ public class SpawnManager : MonoBehaviour
         else
         {
             //get random spawn position if there is no settlement
-            SpawnPosition = GetSpawnPoint();
+            SpawnPosition = GetSpawnPointOutsideOfCameraBounds();
         }
         print("spawn enemy camp");
         //Spawn a random number of enemies proportional to the  GameDifficulty?
@@ -130,12 +126,20 @@ public class SpawnManager : MonoBehaviour
     {
         //Get Random settlement that isn't destroyed and is outside the camera bounds
         if (WorldGenerator.UndestroyedSettlements.Count <= 0) return null; //if no settlements, return null
+        print(WorldGenerator.UndestroyedSettlements.Count);
         int RandomSettlement = Random.Range(0, WorldGenerator.UndestroyedSettlements.Count-1);
         Settlement Settlement = WorldGenerator.UndestroyedSettlements[RandomSettlement];
+        int NoOfIterations = 0; //here to just stop if the iterations are too much. If so, then just stop,and return null
         while(PositionInCameraBounds(Settlement.transform.position) || Vector3.Distance(Player.transform.position, Settlement.transform.position) > 200)
         {
             RandomSettlement = Random.Range(0, WorldGenerator.UndestroyedSettlements.Count - 1);
             Settlement = WorldGenerator.UndestroyedSettlements[RandomSettlement];
+            NoOfIterations++;
+            if(NoOfIterations >= 20)
+            {
+                print("return null");
+                return null; //just do random spawn point, this means that there is no settlement (most likely) that is the correct distance away
+            }
         }
 
         return Settlement;
@@ -154,6 +158,16 @@ public class SpawnManager : MonoBehaviour
             return true;
         }
         return false;
+    }
+
+    Vector3 GetSpawnPointOutsideOfCameraBounds()
+    {
+        Vector3 SpawnPoint = GetSpawnPoint();
+        while (PositionInCameraBounds(SpawnPoint))
+        {
+            SpawnPoint = GetSpawnPoint();
+        }
+        return SpawnPoint;
     }
 
     Vector3 GetSpawnPoint()

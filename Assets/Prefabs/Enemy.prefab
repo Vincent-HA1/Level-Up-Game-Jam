@@ -121,7 +121,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   MoveSpeed: 1
-  EnemyAwarenessRadius: 10
+  EnemyAwarenessRadius: 5
   SettlementLayer:
     serializedVersion: 2
     m_Bits: 8

@@ -9,7 +9,8 @@ public class Settlement : MonoBehaviour
     [Header("Attributes")]
     [SerializeField] private float Health = 100;
     [SerializeField] private float TimeBeforeTakingDamage = 20;
-    [SerializeField] private float DamagePerSecond = 3;
+    [SerializeField] private float BaseDamagePerSecond = 3;
+    [SerializeField] private float MaxDamagePerSecond = 12;
     [SerializeField] private float RecoveryRate = 5;
 
     [Header("References")]
@@ -24,10 +25,19 @@ public class Settlement : MonoBehaviour
 
 
     private float DamageTimer = 0;
-    private bool EnemyIsGuarding = false;
+    private bool EnemyIsAttacking = false;
+    [SerializeField] private float NumberOfEnemiesAttacking = 0;
     public bool IsDestroyed {  get; private set;}
+    public bool IsCaptured { get; private set; }
 
-    enum SettlementState{
+    //Reference to player
+    protected PlayerController PlayerController;
+
+    protected float ResourceTimer = 0;
+
+
+    enum SettlementState
+    {
         Uncaptured,
         Captured,
         Destroyed,
@@ -38,9 +48,13 @@ public class Settlement : MonoBehaviour
     private BoxCollider2D BoxCollider;
 
     public Action<Settlement> SettlementDestroyed;
+    public Action<Settlement> SettlementAttacked;
+    public Action<Settlement> SettlementIsSafe;
+
+
 
     // Start is called before the first frame update
-    void Start()
+    public virtual void Start()
     {
         SpriteRenderer = GetComponent<SpriteRenderer>();
         BoxCollider = GetComponent<BoxCollider2D>();
@@ -52,49 +66,65 @@ public class Settlement : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update()
+    public virtual void Update()
     {
         if (State != SettlementState.Destroyed)
         {
-            Collider2D EnemyOverlapped = Physics2D.OverlapCircle(transform.position, 5, EnemyLayer);
-            Collider2D PlayerOverlapped = Physics2D.OverlapBox(transform.position, new Vector2(1, 1), 0, PlayerLayer);
-            if (EnemyOverlapped != null)
+            //CheckForEnemy();
+            CheckForPlayer();
+            TakeDamage();
+            if (State == SettlementState.Captured && !EnemyIsAttacking)
             {
-                EnemyIsGuarding = true;
+                TickResources();
             }
-            else
-            {
-                EnemyIsGuarding = false;
-                DamageTimer = 0;
-            }
-            if (PlayerOverlapped != null)
-            {
-                print(PlayerOverlapped);
-                State = SettlementState.Captured;
-                SpriteRenderer.sprite = CapturedSprite;
-            }
-            if (EnemyIsGuarding)
-            {
-                print("Enemy is guarding");
-                DamageTimer += Time.deltaTime;
-                if (DamageTimer > TimeBeforeTakingDamage)
-                {
-                    //start taking damage
-                    Health -= Time.deltaTime * DamagePerSecond;
-                    if (Health <= 0)
-                    {
-                        DestroySettlement();
-                    }
-                }
-            }
-            HealthBarSlider.value = Health;
         }
 
 
     }
 
-    void DestroySettlement()
+    private void TakeDamage()
     {
+        if (EnemyIsAttacking)
+        {
+            DamageTimer += Time.deltaTime;
+            if (DamageTimer > TimeBeforeTakingDamage)
+            {
+                float DamagePerSecond = Mathf.Clamp(BaseDamagePerSecond * NumberOfEnemiesAttacking, 0, MaxDamagePerSecond);
+                print(DamagePerSecond);
+                //start taking damage
+                Health -= Time.deltaTime * DamagePerSecond;
+                if (Health <= 0)
+                {
+                    DestroySettlement();
+                }
+            }
+        }
+        HealthBarSlider.value = Health;
+    }
+
+    public void AddEnemyAttacker()
+    {
+        NumberOfEnemiesAttacking += 1;
+        if (EnemyIsAttacking)
+        {
+            SettlementAttacked?.Invoke(this);
+        }
+        EnemyIsAttacking= true;
+    }
+
+    public void RemoveEnemyAttacker()
+    {
+        NumberOfEnemiesAttacking -= 1;
+        if(NumberOfEnemiesAttacking <= 0)
+        {
+            EnemyIsAttacking = false;
+            SettlementIsSafe?.Invoke(this);
+        }
+    }
+
+    public virtual void DestroySettlement()
+    {
+        IsDestroyed = true;
         SettlementDestroyed?.Invoke(this);
         State = SettlementState.Destroyed;
         SpriteRenderer.sprite = DestroyedSprite;
@@ -104,14 +134,46 @@ public class Settlement : MonoBehaviour
         //Destroy(gameObject);
     }
 
-    private void OnTriggerEnter2D(Collider2D collision)
+
+    void CheckForPlayer()
     {
-        if(collision.gameObject.layer == PlayerLayer)
+        //Can only interact with settlement if it isn't being attacked
+        if (!EnemyIsAttacking)
         {
-            State = SettlementState.Captured;
-            SpriteRenderer.sprite = CapturedSprite;
+            Collider2D PlayerOverlapped = Physics2D.OverlapBox(transform.position, new Vector2(1, 1), 0, PlayerLayer);
+            if (PlayerOverlapped)
+            {
+                if (!PlayerController)
+                {
+                    PlayerController = PlayerOverlapped.GetComponent<PlayerController>();
+                }
+                if (State != SettlementState.Captured)
+                {
+                    State = SettlementState.Captured;
+                    SpriteRenderer.sprite = CapturedSprite;
+                    IsCaptured = true;
+                }
+                else
+                {
+                    ClaimResources();
+                }
+            }
         }
+
+
     }
 
-   
+    //Settlement specific function for adding resources to the player
+    public virtual void ClaimResources()
+    {
+        ResourceTimer = 0;
+    }
+
+    //Settlement specific function for accumulat
+    public virtual void TickResources()
+    {
+        ResourceTimer += Time.deltaTime;
+    }
+
+
 }

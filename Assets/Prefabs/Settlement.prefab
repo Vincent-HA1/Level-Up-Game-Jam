@@ -578,7 +578,7 @@ SpriteRenderer:
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!114 &9056887063006313384
@@ -594,11 +594,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Health: 100
-  TimeBeforeTakingDamage: 20
+  TimeBeforeTakingDamage: 2
+  DamagePerSecond: 40
+  RecoveryRate: 5
   HealthBarSlider: {fileID: 5972125250225465697}
+  DestroyedSprite: {fileID: -917075723, guid: 568b475680c33af43818406a4b535b1d, type: 3}
+  UncapturedSprite: {fileID: 1790480445, guid: 568b475680c33af43818406a4b535b1d, type: 3}
+  CapturedSprite: {fileID: -790896389, guid: 568b475680c33af43818406a4b535b1d, type: 3}
   EnemyLayer:
     serializedVersion: 2
     m_Bits: 128
+  PlayerLayer:
+    serializedVersion: 2
+    m_Bits: 64
 --- !u!61 &9056887063006313383
 BoxCollider2D:
   m_ObjectHideFlags: 0
